@@ -55,6 +55,11 @@ class VatReportWizard(models.TransientModel):
         csv_data = []
         if invoice_objs:
             for inv in invoice_objs:
+                rInv = False
+                has_tax = False
+                if inv.type == 'out_refund' and inv.origin:
+                    rInv = self.env['account.invoice'].search([
+                        ('number', '=', inv.origin)])
                 amount = 0.0
                 for invoice_line in inv.invoice_line_ids:
                     # price_unit = invoice_line.price_unit * (1 - (invoice_line.discount or 0.0) / 100.0)
@@ -66,21 +71,26 @@ class VatReportWizard(models.TransientModel):
                     #     inv.partner_id)['taxes']
                     for tax in invoice_line.invoice_line_tax_ids:
                         if self.tax_id.id == tax.id:
+                            has_tax = True
                             if inv.type == 'out_refund':
                                 amount += (-1 * invoice_line.price_subtotal)
                             else:
                                 amount += invoice_line.price_subtotal
                             # for amount in taxes:
                             #     tax_amount += amount['amount']
-                data = [inv.partner_id.x_pinnumber,
-                        inv.partner_id.name,
-                        inv.company_id.company_registry,
-                        inv.date_invoice,
-                        inv.number,
-                        inv.name if inv.type == 'out_refund' else 'Sale of Stocks',
-                        amount]
+                if has_tax:
+                    data = [inv.partner_id.x_pinnumber,
+                            inv.partner_id.name,
+                            inv.company_id.company_registry,
+                            inv.date_invoice,
+                            inv.number,
+                            inv.name if inv.type == 'out_refund' else 'Sale of Stocks',
+                            amount,
+                            rInv.number if rInv else '',
+                            rInv.date_invoice if rInv else '',
+                            rInv.name if rInv else '',]
 
-                csv_data.append(data)
+                    csv_data.append(data)
 
             with open(file_path, "wb") as writeFile:
                 writer = csv.writer(writeFile)
@@ -135,6 +145,11 @@ class VatReportWizard(models.TransientModel):
         csv_data = []
         if invoice_objs:
             for inv in invoice_objs:
+                rInv = False
+                has_tax = False
+                if inv.type == 'in_refund' and inv.origin:
+                    rInv = self.env['account.invoice'].search([
+                        ('number', '=', inv.origin)])
                 amount = 0.0
                 for invoice_line in inv.invoice_line_ids:
                     # price_unit = invoice_line.price_unit * (1 - (invoice_line.discount or 0.0) / 100.0)
@@ -147,20 +162,25 @@ class VatReportWizard(models.TransientModel):
                     # print "tax===================",taxes
                     for tax in invoice_line.invoice_line_tax_ids:
                         if self.tax_id.id == tax.id:
+                            has_tax = True
                             if inv.type == 'in_refund':
                                 amount += (-1 * invoice_line.price_subtotal)
                             else:
                                 amount += invoice_line.price_subtotal
-                data = [inv.partner_id.customer_flag if inv.partner_id.customer_flag else '',
-                        inv.partner_id.x_pinnumber,
-                        inv.partner_id.name,
-                        inv.date_invoice,
-                        inv.number,
-                        inv.number if inv.type == 'in_refund' else 'purchase of stock',
-                        inv.custom_entry_number if inv.custom_entry_number else '',
-                        amount]
+                if has_tax:
+                    data = [inv.partner_id.customer_flag if inv.partner_id.customer_flag else '',
+                            inv.partner_id.x_pinnumber,
+                            inv.partner_id.name,
+                            inv.date_invoice,
+                            inv.reference,
+                            inv.number if inv.type == 'in_refund' else 'purchase of stock',
+                            inv.custom_entry_number if inv.custom_entry_number else '',
+                            amount,
+                            rInv.number if rInv else '',
+                            rInv.date_invoice if rInv else '',
+                            rInv.name if rInv else '',]
 
-                csv_data.append(data)
+                    csv_data.append(data)
 
             with open(file_path, "wb") as writeFile:
                 writer = csv.writer(writeFile)
